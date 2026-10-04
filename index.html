@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>8 Lucky Wheels ปาร์ตี้ปีใหม่</title>
+    <link href="https://fonts.googleapis.com/css2?family=Kanit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary-bg: #9b51e0;
+            --card-bg: #ffffff;
+            --btn-green: #27ae60;
+            --btn-yellow: #f1c40f;
+            --btn-purple: #8e44ad;
+        }
+        body { font-family: 'Kanit', sans-serif; background: linear-gradient(135deg, var(--primary-bg), #6c3483); color: #333; margin: 0; padding: 20px; min-height: 100vh; }
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 2.5rem; margin-bottom: 5px; }
+        .header p { font-size: 1rem; opacity: 0.9; }
+        .controls { display: flex; justify-content: center; gap: 15px; margin-top: 20px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 25px; font-size: 1rem; font-family: inherit; cursor: pointer; color: white; font-weight: 600; transition: transform 0.2s; }
+        .btn:hover { transform: scale(1.05); }
+        .btn-green { background-color: var(--btn-green); }
+        .btn-yellow { background-color: var(--btn-yellow); color: #333; }
+        .btn-purple { background-color: var(--btn-purple); width: 100%; margin-top: 15px; }
+        .wheels-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; max-width: 1200px; margin: 0 auto; }
+        .card { background: var(--card-bg); border-radius: 15px; padding: 20px; text-align: center; box-shadow: 0 10px 20px rgba(0,0,0,0.15); }
+        .wheel-container { position: relative; width: 200px; height: 200px; margin: 0 auto 15px; }
+        .wheel { width: 100%; height: 100%; border-radius: 50%; background: repeating-conic-gradient(from 0deg, #ff9a9e 0deg 10deg, #fecfef 10deg 20deg, #a1c4fd 20deg 30deg, #c2e9fb 30deg 40deg, #f6d365 40deg 50deg, #fda085 50deg 60deg); border: 3px solid #eee; transition: transform 3s cubic-bezier(0.25, 0.1, 0.25, 1); }
+        .pointer { position: absolute; top: 50%; right: -15px; transform: translateY(-50%); width: 0; height: 0; border-top: 15px solid transparent; border-bottom: 15px solid transparent; border-right: 20px solid #e74c3c; z-index: 10; }
+        .center-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .winner-name { font-weight: 600; color: #333; min-height: 24px; }
+        
+        /* Modal */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 1000; align-items: center; justify-content: center; }
+        .modal-content { background: white; padding: 30px; border-radius: 15px; text-align: center; max-width: 400px; width: 90%; box-shadow: 0 20px 40px rgba(0,0,0,0.2); animation: popIn 0.3s ease; }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-img { width: 150px; height: 150px; border-radius: 15px; object-fit: cover; border: 4px solid var(--primary-bg); margin-bottom: 15px; }
+        #status-msg { color: #f1c40f; font-weight: bold; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <header class="header">
+        <h1>🎉 8 Lucky Wheels ปาร์ตี้ปีใหม่ 🎉</h1>
+        <p>เชื่อมต่อรายชื่อและรูปภาพจาก Google Sheet เรียบร้อยแล้ว</p>
+        <p id="status-msg">กำลังโหลดข้อมูลรายชื่อ...</p>
+        <div class="controls">
+            <button class="btn btn-green" onclick="spinAll()">🔄 สุ่มทั้งหมดพร้อมกัน</button>
+            <button class="btn btn-yellow" onclick="alert('ฟีเจอร์สรุปผลกำลังพัฒนา')">🏆 ดูสรุปผู้โชคดี</button>
+        </div>
+    </header>
+
+    <main class="wheels-grid" id="wheels-container"></main>
+
+    <!-- Popup -->
+    <div class="modal-overlay" id="winnerModal">
+        <div class="modal-content">
+            <h3 id="modal-title" style="margin-top:0;">ผู้เข้าแข่งขันเล่นเกมส์</h3>
+            <img src="" alt="Winner" class="modal-img" id="modal-img" onerror="this.src='https://via.placeholder.com/150?text=No+Image'">
+            <h2 id="modal-name">ชื่อผู้โชคดี</h2>
+            <p>ยินดีด้วยครับ/ค่ะ! 🎉</p>
+            <button class="btn btn-purple" onclick="closeModal()" style="width: 100px;">ปิด</button>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // 1. นำลิงก์ CSV ที่ได้จาก Google Sheet มาวางในเครื่องหมายคำพูดด้านล่างนี้
+        // ==========================================
+        const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vToP5SirNr1LvKDTzQOsDSErafGH06lQKDMsjPiDUC9Cq6zfQQAbD-SsRwn_16g71PsEEmK1uh9We2b/pub?output=csv"; 
+        
+        let participants = [];
+        const container = document.getElementById('wheels-container');
+        let wheels = [];
+
+        // สร้างหน้าตาวงล้อ 8 วง
+        for (let i = 1; i <= 8; i++) {
+            const card = document.createElement('div');
+            card.className = 'card';
+            card.innerHTML = `
+                <div style="margin-bottom: 10px; color: #666; font-size: 0.9rem;">⚪ วงล้อที่ ${i}</div>
+                <div class="wheel-container">
+                    <div class="pointer"></div>
+                    <div class="wheel" id="wheel-${i}"></div>
+                    <div class="center-text">WIN</div>
+                </div>
+                <div class="winner-name" id="winner-${i}">- รอการสุ่ม -</div>
+                <button class="btn btn-purple" onclick="spinWheel(${i})">หมุนวงล้อที่ ${i}</button>
+            `;
+            container.appendChild(card);
+            wheels.push({ id: i, rotation: 0 });
+        }
+
+        // โหลดข้อมูลจาก Google Sheet
+        async function loadSheetData() {
+            try {
+                const response = await fetch(SHEET_CSV_URL);
+                const data = await response.text();
+                
+                // แยกแถวข้อมูล
+                const rows = data.split(/\r?\n/);
+                
+                // ข้ามแถวที่ 1 (บรรทัดชื่อคอลัมน์) แล้วเริ่มดึงข้อมูล
+                for (let i = 1; i < rows.length; i++) {
+                    const row = rows[i].split(',');
+                    if (row.length >= 2 && row[0].trim() !== '') {
+                        participants.push({
+                            name: row[0].trim(), // คอลัมน์ A: ชื่อ
+                            image: row[1].trim() // คอลัมน์ B: ลิงก์รูปภาพ
+                        });
+                    }
+                }
+                document.getElementById('status-msg').innerText = `✅ โหลดรายชื่อสำเร็จทั้งหมด ${participants.length} คน พร้อมสุ่มแล้ว!`;
+                document.getElementById('status-msg').style.color = '#2ecc71';
+            } catch (error) {
+                console.error('Error fetching sheet data:', error);
+                document.getElementById('status-msg').innerText = '❌ เกิดข้อผิดพลาดในการโหลดข้อมูล กรุณาตรวจสอบลิงก์ CSV';
+                document.getElementById('status-msg').style.color = '#e74c3c';
+            }
+        }
+
+        // เริ่มโหลดข้อมูลทันทีที่เปิดเว็บ
+        if (SHEET_CSV_URL !== "วางลิงก์_CSV_ที่นี่") {
+            loadSheetData();
+        }
+
+        // สุ่มชื่อและรูปจาก array
+        function getRandomParticipant() {
+            if (participants.length === 0) return { name: "ไม่มีข้อมูล", image: "" };
+            return participants[Math.floor(Math.random() * participants.length)];
+        }
+
+        function spinWheel(index) {
+            if (participants.length === 0) {
+                alert("กรุณารอโหลดข้อมูล หรือตรวจสอบลิงก์ Google Sheet");
+                return;
+            }
+
+            const wheelDiv = document.getElementById(`wheel-${index}`);
+            const winnerText = document.getElementById(`winner-${index}`);
+            
+            const extraSpins = (Math.floor(Math.random() * 5) + 5) * 360; 
+            const randomDegree = Math.floor(Math.random() * 360);
+            
+            wheels[index-1].rotation += extraSpins + randomDegree;
+            wheelDiv.style.transform = `rotate(${wheels[index-1].rotation}deg)`;
+            
+            winnerText.innerText = "กำลังสุ่ม...";
+
+            setTimeout(() => {
+                const winner = getRandomParticipant();
+                winnerText.innerHTML = `🎉 ${winner.name}`;
+                showModal(index, winner.name, winner.image);
+            }, 3000);
+        }
+
+        function spinAll() {
+            for (let i = 1; i <= 8; i++) {
+                spinWheel(i);
+            }
+        }
+
+        function showModal(wheelIndex, name, imageUrl) {
+            document.getElementById('modal-title').innerText = `วงล้อที่ ${wheelIndex} ผู้ชนะ!`;
+            document.getElementById('modal-name').innerText = name;
+            document.getElementById('modal-img').src = imageUrl;
+            document.getElementById('winnerModal').style.display = 'flex';
+        }
+
+        function closeModal() {
+            document.getElementById('winnerModal').style.display = 'none';
+        }
+    </script>
+</body>
+</html>
